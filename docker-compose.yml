@@ -1,0 +1,16 @@
+version: '3.4'
+
+services:
+  hanfei:
+    image: tsti/hanfei:dev
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: HanFei-DEV
+    volumes:
+      - "D:/source/hanfei_root/hanfei/dist:/opt/hanfei/dist"
+      - "D:/source/hanfei_root/hanfei/logs:/opt/hanfei/logs"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "3978:3978"
