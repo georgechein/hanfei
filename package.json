@@ -1,0 +1,24 @@
+{
+  "name": "line-web-login",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "body-parser": "^1.18.2",
+    "express": "^4.16.2",
+    "log4js": "^1.1.1",
+    "log4js-extend": "^0.1.2",
+    "nodejieba": "^2.2.5",
+    "request": "^2.85.0",
+    "fs": "latest",
+    "fast-csv" : "latest"
+  },
+  "engines": {
+    "node": "8.9.4"
+  }
+}

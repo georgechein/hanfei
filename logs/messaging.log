@@ -1,0 +1,11 @@
+[2018-06-01 11:21:14.385] [ERROR] bot - uncaughtException occurred: ReferenceError: text_msg is not defined
+    at Hanfei.test (C:\Users\洪國竣\Documents\myLINEBoost\hanfei.js:86:37)
+    at Server.<anonymous> (C:\Users\洪國竣\Documents\myLINEBoost\app.js:330:25)
+    at Object.onceWrapper (events.js:313:30)
+    at emitNone (events.js:106:13)
+    at Server.emit (events.js:208:7)
+    at emitListeningNT (net.js:1378:10)
+    at _combinedTickCallback (internal/process/next_tick.js:135:11)
+    at process._tickCallback (internal/process/next_tick.js:180:9)
+    at Function.Module.runMain (module.js:678:11)
+    at startup (bootstrap_node.js:187:16) (at <anonymous> app.js:335:12)

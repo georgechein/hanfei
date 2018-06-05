@@ -1,0 +1,23 @@
+{
+	"appenders": [
+		{
+			"type": "console"
+		},
+		{
+			"type": "logLevelFilter",
+			"appender": {
+				"type": "file",
+				"filename": "logs/messaging.log"
+			},
+			"layout": {
+				"type": "basic"
+			},
+			"category": [
+				"bot",
+				"hanfei"
+			],
+			"level": "error"
+		}
+	],
+	"replaceConsole": true
+}

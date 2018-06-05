@@ -1,0 +1,1548 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+    
+    <head>
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <link href="/css/botchat.css" rel="stylesheet" />
+        <link href="/css/bootstrap/bootstrap.css" rel="stylesheet" />
+        <link href="/css/font-awesome-4.1.0/css/font-awesome.min.css" rel="stylesheet" />
+        <link href="/css/bootstrap/dataTables.bootstrap.css" rel="stylesheet" />
+        <link href="/css/jquery-ui/jquery-ui.css" rel="stylesheet">
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>QA編輯器</title>
+        <style type="text/css">
+            body {
+                padding: 10px;
+                font-family: consolas;
+            }
+    
+            .modal.modal-wide .modal-dialog {
+                width: 90%;
+            }
+    
+            .modal-wide .modal-body {
+                overflow-y: auto;
+            }
+    
+            .modal.modal-middle .modal-dialog {
+                width: 60%;
+            }
+    
+            .modal-middle .modal-body {
+                overflow-y: auto;
+            }
+    
+            table.dataTable thead .sorting,
+            table.dataTable thead .sorting_asc,
+            table.dataTable thead .sorting_desc,
+            table.dataTable thead .sorting_asc_disabled,
+            table.dataTable thead .sorting_desc_disabled {
+                background: 0 0;
+            }
+    
+            table.dataTable thead .sorting_asc:after {
+                content: "\f0de";
+                float: right;
+                font-family: fontawesome;
+            }
+    
+            table.dataTable thead .sorting_desc:after {
+                content: "\f0dd";
+                float: right;
+                font-family: fontawesome;
+            }
+    
+            table.dataTable thead .sorting:after {
+                content: "\f0dc";
+                float: right;
+                font-family: fontawesome;
+                color: rgba(50, 50, 50, .5);
+            }
+    
+            .border-highlight {
+                border-width: 2px;
+                border-color: orange;
+                border-style: solid;
+            }
+        </style>
+        <script type="text/javascript" src="/scripts/jquery/jquery-1.9.0.min.js"></script>
+        <script type="text/javascript" src="/scripts/jquery-ui/jquery-ui.js"></script>
+        <script type="text/javascript" src="/scripts/bootstrap/bootstrap.min.js"></script>
+        <script type="text/javascript" src="/scripts/bootstrap/bootbox/bootbox.min.js"></script>
+        <script type="text/javascript" src="/scripts/bootstrap/bootstrapValidator/bootstrapValidator.min.js"></script>
+        <script type="text/javascript" src="/scripts/bootstrap/dataTables/jquery.dataTables.js"></script>
+        <script type="text/javascript" src="/scripts/bootstrap/dataTables/dataTables.bootstrap.js"></script>
+        <script type="text/javascript" src="/scripts/Hashtable.js"></script>
+        <script type="text/javascript">
+            var Dialogs = [];
+            var Locale = 'tw';
+            var Locales = [];
+            var Variables = new $.Hashtable();
+            var $MainTable;
+            var $VariableTable;
+            var $MessageTable;
+            var Socket;
+            var DeleteMode = false;
+            var auto_message = -1;
+            var last_id = 1;
+            $(document).ready(function () {
+                Loading();
+                $('h1[name="title"]').text($('h1[name="title"]').text());
+                $.ajax({
+                    url: '../refresh/QA',
+                    type: 'POST',
+                    data: { "Refresh": "true" },
+                    success: function (ret) {
+                        Loaded();
+                        Refresh();
+                    }
+                });
+    
+                $('#DivWebAPI').find('[name="Method"]').change(function () {
+                    if ($(this).val() == 'post' || $(this).val() == 'put' || $(this).val() == 'delete') {
+                        $('#BtnParams').removeClass('hidden');
+                    } else {
+                        $('#BtnParams').addClass('hidden');
+                    }
+                });
+    
+                $('#TxtType').change(function () {
+                    $('[id^="Template"').addClass('hidden');
+                    if ($(this).val() == 'text') {
+                        TargetDialog = {
+                            'id': TargetDialog.id, 'type': 'text', "content": {
+                                "text": "顯示的文字"
+                            },
+                            "metadata":[
+                                {
+                                    "name":"PAS",
+                                    "value": ""
+                                }
+                            ]
+                        };
+                    } else if ($(this).val() == 'webapi') {
+                        TargetDialog = {
+                            'id': TargetDialog.id, 'type': 'webapi', 'content': {
+                                'protocol': '', 'host': "", 'port': '', 'path': '', 'method': ''
+                            },
+                            "metadata":[
+                                {
+                                    "name":"PAS",
+                                    "value": ""
+                                }
+                            ]
+                        };
+                    } else if ($(this).val() == 'image') {
+                        TargetDialog = {
+                            'id': TargetDialog.id, 'type': 'image', "content": {
+                                "previewImageUrl": "",
+                                "description":"請給予圖片說明"
+                            },
+                            "metadata":[
+                                {
+                                    "name":"PAS",
+                                    "value": ""
+                                }
+                            ]
+                        };
+                    } else if ($(this).val() == 'page') {
+                        TargetDialog = {
+                            'id': TargetDialog.id, 'type': 'page', "content": {
+                                "url": "",
+                                "title": "請設定前往網站資訊"
+                            },
+                            "metadata":[
+                                {
+                                    "name":"PAS",
+                                    "value": ""
+                                }
+                            ]
+                        };
+                    } else if ($(this).val() == 'flow') {
+                        TargetDialog = {
+                            'id': TargetDialog.id, 'type': 'flow', "content": {
+                                "flowID": ""
+                            },
+                            "metadata":[
+                                {
+                                    "name":"PAS",
+                                    "value": ""
+                                }
+                            ]
+                        };
+                    } else if ($(this).val() == 'choice') {
+                        TargetDialog = {
+                            'id': TargetDialog.id, 'type': 'choice', "content": {
+                                "previewImageUrl": "",
+                                "title":"產品諮詢結果",
+                                "description": "請輸入產品說明，勿超過20字",
+                                "buttons": []
+                            },
+                            "metadata":[
+                                {
+                                    "name":"PAS",
+                                    "value": ""
+                                }
+                            ]
+                        };
+                    }
+    
+                    if (TargetDialog.type == 'webapi') {
+                        $('#DivDialog').addClass('hidden');
+                        $('#DivWebAPI').removeClass('hidden');
+                        $('#DivFlow').addClass('hidden');
+                    } else if(TargetDialog.type == 'flow') {
+                        $('#DivDialog').addClass('hidden');
+                        $('#DivWebAPI').addClass('hidden');
+                        $('#DivFlow').removeClass('hidden');
+                    } else {
+                        $('#DivDialog').removeClass('hidden');
+                        $('#DivWebAPI').addClass('hidden');
+                        $('#DivFlow').addClass('hidden');
+                    }
+                    TempDialog = TargetDialog;
+                    $('#TxtDialog').html(CreateContent(TargetDialog, 'Edit'));
+                });
+    
+                $('#BtnAdd').click(function () {
+                    $('#DialogModal')
+                        .attr({
+                            Mode: 'ADD'
+                        })
+                        .modal();
+                });
+    
+                $('#BtnParams').click(function () {
+                    $('#TableHeaders tbody').empty();
+                    if (TargetDialog.webapi.headers == undefined) {
+                        TargetDialog.webapi.headers = [];
+                    }
+                    for (var idx = 0; idx < TargetDialog.webapi.headers.length; idx++) {
+                        $('#TableHeaders')
+                            .append(
+                                $(document.createElement('tr'))
+                                    .append(
+                                        $(document.createElement('td'))
+                                            .append(
+                                                $(document.createElement('button'))
+                                                    .attr('title', '刪除')
+                                                    .addClass('btn btn-danger btn-circle btn-xs')
+                                                    .append(
+                                                        $(document.createElement('i'))
+                                                            .addClass('fa fa-times')
+                                                    )
+                                                    .click(function () {
+                                                        $(this).parent().parent().remove();
+                                                    })
+                                            )
+                                    )
+                                    .append(
+                                        $(document.createElement('td'))
+                                            .append(
+                                                $(document.createElement('input'))
+                                                    .attr('name', 'Name')
+                                                    .val(TargetDialog.webapi.headers[idx].name)
+                                                    .css({
+                                                        'word-break': 'break-all',
+                                                        'border': 0
+                                                    })
+                                            )
+                                    ).append(
+                                        $(document.createElement('td'))
+                                            .append(
+                                                $(document.createElement('input'))
+                                                    .attr('name', 'Value')
+                                                    .val(TargetDialog.webapi.headers[idx].value)
+                                                    .css({
+                                                        'word-break': 'break-all',
+                                                        'border': 0
+                                                    })
+                                            )
+                                    )
+                            )
+                    }
+                    $('#PostModal').find('textarea[name="Body"]').val(TargetDialog.webapi.body);
+                    $('#PostModal')
+                        .attr({
+                            Mode: 'ADD'
+                        })
+                        .modal();
+                });
+    
+                $('#BtnView').click(function () {
+                    window.open('flowchart/' + FlowID);
+                });
+    
+                $('#BtnAddHeader').click(function () {
+                    AddHeader();
+                });
+                
+                $('#BtnPublish').click(function () {
+                    $.ajax({
+                        url: '../QA/Publish',
+                        type: 'POST',
+                        data: { QA: " " },
+                        success: function (ret) {
+                            alert('發布成功');
+                        }
+                    });
+                });
+                
+                $('#BtnSavePost').click(function () {
+                    var post = {};
+                    post.headers = [];
+                    var headers = $('#TableHeaders').find('tr');
+                    for (var idx = 1; idx < headers.length; idx++) {
+                        var header = {};
+                        header.name = $(headers[idx]).find('input[name="Name"]').val();
+                        header.value = $(headers[idx]).find('input[name="Value"]').val();
+                        if (header.name != undefined && header.name != '') {
+                            if (header.value == undefined) {
+                                header.value = '';
+                            }
+                            post.headers.push(header);
+                        }
+                    }
+                    post.body = $('#PostModal').find('[name="Body"]').val();
+                    TempDialog.webapi.headers = post.headers;
+                    TempDialog.webapi.body = post.body;
+                    $('#PostModal').modal('toggle');
+                    return false;
+                });
+                
+                $('#QA').click(function () {
+                var formData = new FormData();
+                formData.append('file', $('#file')[0].files[0]);
+                $.ajax({
+                    url: 'https://qa-blob-storage.azurewebsites.net/attachment/upload/sales',
+                    type: 'POST',
+                    cache: false,
+                    data: formData,  
+                    processData: false,
+                    contentType: false
+                }).done(function(res) {
+                    $('#file').val('');
+                    $('#TemplateButton').find('[name="Value"]').val("https://qa-blob-storage.azurewebsites.net/attachment/download/sales/" + res.blobName);
+                  alert("上傳成功，會將上傳檔案網址自動填入Url欄位");
+                }).fail(function(res) {
+                    alert("上傳失敗，請稍後在試");
+                });
+              });
+              
+              $('#QA_image').click(function () {
+                var formData = new FormData();
+                formData.append('file', $('#image_file')[0].files[0]);
+                $.ajax({
+                    url: 'https://qa-blob-storage.azurewebsites.net/attachment/upload/sales',
+                    type: 'POST',
+                    cache: false,
+                    data: formData,  
+                    processData: false,
+                    contentType: false
+                }).done(function(res) {
+                    $('#image_file').val('');
+                    $('#TemplateImage').find('[name="Url"]').val("https://qa-blob-storage.azurewebsites.net/attachment/download/sales/" + res.blobName);
+                  alert("上傳成功，會將上傳檔案網址自動填入Url欄位");
+                }).fail(function(res) {
+                    alert("上傳失敗，請稍後在試");
+                });
+              });
+    
+                //新增對話框時所使用的function
+                $('#DialogForm').bootstrapValidator({
+                    feedbackIcons: {
+                    },
+                    fields: {
+                        DialogID: {
+                            validators: {
+                                notEmpty: {
+                                    message: '不得為空值'
+                                }
+                            }
+                        }
+                    },
+                    fields: {
+                        Question: {
+                            validators: {
+                                notEmpty: {
+                                    message: '不得為空值'
+                                }
+                            }
+                        }
+                    }
+                }).on('error.form.bv', function (e, data) {
+                }).on('success.form.bv', function (e, data) {
+                    Loading();
+
+                    if ($('#DialogModal').attr('Mode') == 'EDIT') {
+                        updateEdit();
+                    } else {
+                        TempDialog.questions = $('#TxtQuestion').val().split(',');
+                        if(TempDialog.metadata == undefined){
+                            TempDialog.metadata = [];
+                            var Pas = {
+                                "name":"PAS",
+                                "value": $('#TxtPas').val()
+                            }
+                            TempDialog.metadata.push(Pas);
+                        } else {
+                            TempDialog.metadata[0].value = $('#TxtPas').val();
+                        }
+                        if(TempDialog.type == 'webapi'){
+                            TempDialog.content.protocol = $('#DivWebAPI').find('select[name="Protocol"]').val();
+                            TempDialog.content.host = $('#DivWebAPI').find('input[name="Host"]').val();
+                            TempDialog.content.port = $('#DivWebAPI').find('input[name="Port"]').val();
+                            TempDialog.content.path = $('#DivWebAPI').find('input[name="Path"]').val();
+                            TempDialog.content.method = $('#DivWebAPI').find('select[name="Method"]').val();
+                        } else if(TempDialog.type == 'flow') {
+                            TempDialog.content.flowID = $('#DivFlow').find('select[name="Flow"]').val();
+                        }
+                        
+                        $.post('../QA',
+                            { QA: TempDialog },
+                            function (ret, status) {
+                                Loaded();
+                                if (status == 'success') {
+                                    $('#DialogModal').modal('toggle');
+                                    Refresh();
+                                } else {
+                                    ShowMessage(ret);
+                                }
+                            }
+                        );
+                    }
+                    return false;   // 防止 Submit 造成畫面 Reload
+                });
+    
+                $('#DialogModal').on('shown.bs.modal', function () {
+                    $('[id^="Template"').addClass('hidden');
+                    if ($(this).attr('Mode') == 'EDIT') {
+                        $('#ModalTitle').text('Qa修改');
+                        TargetDialog = JSON.parse($(this).attr('Dialog'));
+                        TargetDialog = JSON.parse(TargetDialog.answer);
+                        TargetDialog.id = $(this).attr('Dialog_id');
+                        TempDialog = TargetDialog;
+                        $('#TxtDialog').html(CreateContent(TargetDialog, 'Edit'));
+                        $('#TxtPas').val($(this).attr('Pas'));
+                        if (TargetDialog.type == 'webapi') {
+                            $('#DivFlow').addClass('hidden');
+                            $('#DivDialog').addClass('hidden');
+                            $('#DivWebAPI').removeClass('hidden');
+                            $('#DivWebAPI').find('select[name="Protocol"]').val(TargetDialog.content.protocol);
+                            $('#DivWebAPI').find('input[name="Host"]').val(TargetDialog.content.host);
+                            $('#DivWebAPI').find('input[name="Port"]').val(TargetDialog.content.port);
+                            $('#DivWebAPI').find('input[name="Path"]').val(TargetDialog.content.path);
+                            $('#DivWebAPI').find('select[name="Method"]').val(TargetDialog.content.method);
+                            $('#BtnParams').addClass('hidden');
+                            if (TargetDialog.content.method != 'get') {
+                                $('#BtnParams').removeClass('hidden');
+                            }
+                        } else if(TargetDialog.type == 'flow') {
+                            $('#DivDialog').addClass('hidden');
+                            $('#DivWebAPI').addClass('hidden');
+                            $('#DivFlow').removeClass('hidden');
+                            $('#DivFlow').find('select[name=Flow]').children().remove();
+                            $.getJSON('../QA/flow', function (data) {
+                                for(var index = 0; index < data.length; index++){
+                                    $('#DivFlow').find('select[name=Flow]').append('<option value=' + data[index].id +'>'+ data[index].id +'</option>');
+                                }
+                            });
+                            $('#DivFlow').find('select[name=Flow]').val(TargetDialog.content.flowID);
+                        } else {
+                            $('#DivFlow').addClass('hidden');
+                            $('#DivDialog').removeClass('hidden');
+                            $('#DivWebAPI').addClass('hidden');
+                        }
+                        $('#TxtQuestion').val($(this).attr('Question'));
+                        $('#TxtType').val($(this).attr('Type'));
+                    } else {
+                        $('#ModalTitle').text('Qa新增');
+                        TargetDialog = { id: last_id + 1, type: 'text', content: { text: '顯示的文字' } };
+                        TempDialog = TargetDialog;
+                        $('#TxtDialog').html(CreateContent(TargetDialog, 'Edit'));
+                        $('#DivDialog').removeClass('hidden');
+                        $('#DivWebAPI').addClass('hidden');
+                        $('#DivFlow').addClass('hidden');
+                        $('#TxtQuestion').val('');
+                        $('#TxtType').val('text');
+                        // Condition
+                        $('#DivWebAPI').find('select[name="Protocol"]').val('http');
+                        $('#DivWebAPI').find('input[name="Host"]').val('');
+                        $('#DivWebAPI').find('input[name="Port"]').val('');
+                        $('#DivWebAPI').find('input[name="Path"]').val('');
+                        $('#DivWebAPI').find('input[name="Method"]').val('get');
+                        $('#DivWebAPI').find('input[name="Method"]').removeClass('hidden');
+                        $('#DivWebAPI').find('textarea[name="Body"]').val('');
+                        //Flow
+                        $('#DivFlow').find('select[name=Flow]').children().remove();
+                        $.getJSON('../QA/flow', function (data) {
+                            for(var index = 0; index < data.length; index++){
+                                $('#DivFlow').find('select[name=Flow]').append('<option value=' + data[index].id +'>'+ data[index].id +'</option>');
+                            }
+                        });    
+                    }
+                    $('#DialogForm').data('bootstrapValidator').resetForm();
+                });
+            });
+    
+            var TargetDialog = {};
+            var TempDialog = {};
+            var TargetDialogItem;
+    
+            var normalize = function (term) {
+                var ret = "";
+                for (var i = 0; i < term.length; i++) {
+                    ret += term.charAt(i);
+                }
+                return ret;
+            };
+    
+            function updateEdit() {
+                TempDialog.questions = $('#TxtQuestion').val().split(',');
+                if(TempDialog.metadata == undefined){
+                    TempDialog.metadata = [];
+                    var Pas = {
+                        "name":"PAS",
+                        "value": $('#TxtPas').val()
+                    }
+                    TempDialog.metadata.push(Pas);
+                } else {
+                    TempDialog.metadata[0].value = $('#TxtPas').val();
+                }
+                if(TempDialog.type == 'webapi'){
+                    TempDialog.content.protocol = $('#DivWebAPI').find('select[name="Protocol"]').val();
+                    TempDialog.content.host = $('#DivWebAPI').find('input[name="Host"]').val();
+                    TempDialog.content.port = $('#DivWebAPI').find('input[name="Port"]').val();
+                    TempDialog.content.path = $('#DivWebAPI').find('input[name="Path"]').val();
+                    TempDialog.content.method = $('#DivWebAPI').find('select[name="Method"]').val();
+                } else if(TempDialog.type == 'flow') {
+                    TempDialog.content.flowID = $('#DivFlow').find('select[name="Flow"]').val();
+                }
+                $.ajax({
+                    url: '../QA',
+                    type: 'PUT',
+                    data: { QA: TempDialog },
+                    success: function (ret) {
+                        Loaded();
+                        $('#DialogModal').modal('toggle');
+                        Refresh();
+                    }
+                });
+            }
+    
+            function Refresh() {
+                try {
+                    $MainTable.fnDestroy();
+                } catch (e) {
+                }
+                var $Table = $('#TableDialogs tbody');
+                $Table.empty();
+                var QAs = [];
+                    $.getJSON('../QA', function (data) {
+                        QAs = data;
+                        if(QAs != ""){
+                            last_id = Math.max.apply(null, QAs.map(function (o) {
+                                return o.id;
+                            }));
+                        }
+                        for (var index = 0; index < QAs.length; index++) {
+                            var answer;
+                            try {
+                                answer = JSON.parse(QAs[index].answer);
+                            } catch (e) {
+                                continue;
+                            }
+                            var Type;
+                            var Pas;
+                            if (answer.type == 'text') {
+                                Type = '文字';
+                            } else if (answer.type == 'choice') {
+                                Type = '選單';
+                            } else if (answer.type == 'webapi') {
+                                Type = 'Web API';
+                            } else if (answer.type == 'page') {
+                                Type = '網頁';
+                            } else if (answer.type == 'image') {
+                                Type = '圖片';
+                            } else if (answer.type == 'flow') {
+                                Type = '流程';
+                            }
+                            if (QAs[index].metadata != ""){
+                                Pas = QAs[index].metadata[0].value;
+                            } else {
+                                Pas = "";
+                            } 
+                            $('#TableDialogs')
+                                .append(
+                                    $(document.createElement('tr'))
+                                        .append(
+                                            $(document.createElement('td'))
+                                                .append(
+                                                    $(document.createElement('button'))
+                                                        .attr('title', '刪除')
+                                                        .attr('DialogID', QAs[index].id)
+                                                        .addClass('btn btn-danger btn-circle')
+                                                        .append(
+                                                            $(document.createElement('i'))
+                                                                .addClass('fa fa-times')
+                                                        )
+                                                        .click(function () {
+                                                            DialogID_Delete = $(this).attr('DialogID');
+                                                            bootbox.dialog({
+                                                                message: '確定要刪除此項目？',
+                                                                title: '',
+                                                                buttons: {
+                                                                    Cancel: {
+                                                                        label: '取消',
+                                                                        className: 'btn-default'
+                                                                    },
+                                                                    OK: {
+                                                                        label: '確定刪除',
+                                                                        className: 'btn-danger',
+                                                                        callback: function () {
+                                                                            for (var index = 0; index < QAs.length; index++) {
+                                                                                var Dialog = QAs[index];
+                                                                                if (Dialog.id == DialogID_Delete) {
+                                                                                    QAs.splice(index, 1);
+                                                                                    DeleteMode = true;
+                                                                                    $.ajax({
+                                                                                        url: '../QA/' + Dialog.id,
+                                                                                        type: 'DELETE',
+                                                                                        success: function (data) {
+                                                                                            Loaded();
+                                                                                            Refresh();
+                                                                                        }
+                                                                                    });
+                                                                                    break;
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            });
+                                                        })
+                                                )
+                                        )
+                                        .append(
+                                            $(document.createElement('td'))
+                                                .append(
+                                                    $(document.createElement('button'))
+                                                        .attr('title', '編輯')
+                                                        .addClass('btn btn-primary btn-circle')
+                                                        .attr({
+                                                            Dialog_id: QAs[index].id,
+                                                            Dialog: JSON.stringify(QAs[index], null, 4),
+                                                            Question: QAs[index].questions.join(','),
+                                                            Pas: Pas,
+                                                            Type: answer.type,
+                                                        })
+                                                        .append(
+                                                            $(document.createElement('i'))
+                                                                .addClass('fa fa-pencil-square-o')
+                                                        )
+                                                        .click(function () {
+                                                            $('#DialogModal')
+                                                                .attr({
+                                                                    Dialog_id: $(this).attr('Dialog_id'),
+                                                                    Type: $(this).attr('Type'),
+                                                                    Dialog: $(this).attr('Dialog'),
+                                                                    Question: $(this).attr('question'),
+                                                                    Pas: $(this).attr('Pas'),
+                                                                    Mode: 'EDIT'
+                                                                })
+                                                                .modal();
+                                                        })
+                                                )
+                                        )
+                                        .append(
+                                            $(document.createElement('td')).html(QAs[index].questions.join(','))
+                                        )
+                                        .append(
+                                            $(document.createElement('td'))
+                                                .append(
+                                                    $(document.createElement('div'))
+                                                        .css('word-break', 'break-all')
+                                                        .html(CreateContent(answer))
+                                                )
+                                        )
+                                        .append(
+                                            $(document.createElement('td'))
+                                                .html(Type)
+                                            
+                                        )
+                                        .append(
+                                            $(document.createElement('td'))
+                                                .html(Pas)
+                                            
+                                        )
+                                );
+                        }
+                        $MainTable = $('#TableDialogs').dataTable({
+                            'columnDefs': [
+                                { 'searchable': false, 'sortable': false, 'targets': [0, 1, 2, 3, 4, 5] }
+                            ],
+                            'aaSorting': [[2, 'asc']],
+                            'autoWidth': false,
+                            'bPaginate': false,
+                            'bFilter': false,
+                            'sPaginationType': 'full_numbers',
+                            'oLanguage': {
+                                'sLengthMenu': '每頁顯示 _MENU_ 筆資料',
+                                'sZeroRecords': '找不到資料',
+                                'sInfo': '',
+                                'sInfoEmpty': '',
+                                'sInfoFiltered': ' (從 _MAX_ 資料的查詢結果)',
+                                'sSearch': '快速搜尋：',
+                                'oPaginate': {
+                                    'sFirst': '第一頁',
+                                    'sPrevious': '上一頁',
+                                    'sNext': '下一頁',
+                                    'sLast': '最末頁'
+                                }
+                            }
+                        });
+                    });
+            }
+    
+            function GetStringBytes(Target) {
+                var n = Target.length, s;
+                var len = 0;
+                for (var i = 0; i < n; i++) {
+                    s = Target.charCodeAt(i);
+                    while (s > 0) {
+                        len++;
+                        s = s >> 8;
+                    }
+                }
+                return len;
+            }
+    
+            function AddHeader() {
+                $('#TableHeaders')
+                    .append(
+                        $(document.createElement('tr'))
+                            .append(
+                                $(document.createElement('td'))
+                                    .append(
+                                        $(document.createElement('button'))
+                                            .attr('title', '刪除')
+                                            .addClass('btn btn-danger btn-circle btn-xs')
+                                            .append(
+                                                $(document.createElement('i'))
+                                                    .addClass('fa fa-times')
+                                            )
+                                            .click(function () {
+                                                $(this).parent().parent().remove();
+                                            })
+                                    )
+                            )
+                            .append(
+                                $(document.createElement('td'))
+                                    .append(
+                                        $(document.createElement('div'))
+                                            .append($(document.createElement('input'))
+                                                .attr('name', 'Name')
+                                                .css({
+                                                    'word-break': 'break-all',
+                                                    'border': 0
+                                                })
+                                            )
+                                    )
+                            )
+                            .append(
+                                $(document.createElement('td'))
+                                    .append(
+                                        $(document.createElement('div'))
+                                            .append($(document.createElement('input'))
+                                                .attr('name', 'Value')
+                                                .css({
+                                                    'word-break': 'break-all',
+                                                    'border': 0
+                                                })
+                                            )
+                                    )
+                            )
+                    );
+            }
+    
+            function CreateContent(Dialog, Mode) {
+                if (Dialog.type == 'text') {
+                    var $Text;
+                    $Text = Dialog.content.text;
+                    var $Element = $('' +
+                        '<div class="wc-message wc-message-from-bot">' +
+                        '    <div class="wc-message-content">' +
+                        '        <svg class="wc-message-callout">' +
+                        '            <path class="point-left" d="m0,6 l6 6 v-12 z"></path>' +
+                        '            <path class="point-right" d="m6,6 l-6 6 v-12 z"></path>' +
+                        '        </svg>' +
+                        '        <div>' +
+                        '            <span class="format-markdown">' +
+                        '                <p>' +
+                        '                    <span><div name="Prompt">' + $Text + '</div></span>' +
+                        '                </p>' +
+                        '            </span>' +
+                        '        </div>' +
+                        '    </div>' +
+                        '</div>');
+                    if (Mode == 'Edit') {
+                        $Element
+                            .find('div[name="Prompt"]')
+                            .attr('Original', Dialog.content.text)
+                            .click(function () {
+                                $('[id^="Template"').addClass('hidden');
+                                $('#TxtDialog').find('.border-highlight').removeClass('border-highlight');
+                                $(this).addClass('border-highlight');
+                                $('#TemplateText').removeClass('hidden');
+                                $('#TemplateText').find('[name="Prompt"]').val($(this).attr('Original'));
+                                TargetDialogItem = { Type: 'dialog.prompt' };
+                            });
+                    }
+                    return $Element;
+                } else if (Dialog.type == 'choice') {
+                    var Title, Subtitle, Text;
+                    Title = Dialog.content.title;
+                    Subtitle = Dialog.content.description;
+                    var $Element = $('' +
+                        '<div class="wc-message wc-message-from-bot">' +
+                        '    <div class="wc-message-content">' +
+                        '        <svg class="wc-message-callout">' +
+                        '            <path class="point-left" d="m0,6 l6 6 v-12 z"></path>' +
+                        '            <path class="point-right" d="m6,6 l-6 6 v-12 z"></path>' +
+                        '        </svg>' +
+                        '        <div>' +
+                        '            <div class="wc-list">' +
+                        '                <div class="wc-card hero">' +
+                        '                    <h1><div name="Title">' + Title + '</div></h1>' +
+                        '                    <h2><div name="Subtitle">' + Subtitle + '</div></h2>' +
+                        '                    <ul class="wc-card-buttons">' +
+                        '                    </ul>' +
+                        '                </div>' +
+                        '            </div>' +
+                        '        </div>' +
+                        '    </div>' +
+                        '</div>');
+                    if (Mode == 'Edit') {
+                        $Element
+                            .find('div[name="Title"]')
+                            .attr('Original', Dialog.content.title)
+                            .click(function () {
+                                $('[id^="Template"').addClass('hidden');
+                                $('#TxtDialog').find('.border-highlight').removeClass('border-highlight');
+                                $(this).addClass('border-highlight');
+                                $('#TemplateText').removeClass('hidden');
+                                $('#TemplateText').find('[name="Prompt"]').val($(this).attr('Original'));
+                                TargetDialogItem = { Type: 'dialog.content.title' };
+                            });
+                        $Element
+                            .find('div[name="Subtitle"]')
+                            .attr('Original', Dialog.content.description)
+                            .click(function () {
+                                $('[id^="Template"').addClass('hidden');
+                                $('#TxtDialog').find('.border-highlight').removeClass('border-highlight');
+                                $(this).addClass('border-highlight');
+                                $('#TemplateText').removeClass('hidden');
+                                $('#TemplateText').find('[name="Prompt"]').val($(this).attr('Original'));
+                                TargetDialogItem = { Type: 'dialog.content.subtitle' };
+                            });
+                    }
+                    if (Dialog.content.previewImageUrl) {                    
+                            var $Image;
+                            $Image = $('<div name="Image' + 0 + '"><img src="' + Dialog.content.previewImageUrl + '"></image></div>');
+                            $Element
+                                .find('div[class="wc-card hero"]')
+                                .prepend($Image);
+                            if (Mode == 'Edit') {
+                                $Image.click(function () {
+                                    $('[id^="Template"').addClass('hidden');
+                                    $('#TxtDialog').find('.border-highlight').removeClass('border-highlight');
+                                    var $Image = $('#TxtDialog').find('div[name="Image' + this.Index + '"]');
+                                    $Image.addClass('border-highlight');
+                                    $('#TemplateImage').removeClass('hidden');
+                                    var Image = TargetDialog.content.previewImageUrl;
+                                    $('#TemplateImage').find('[name="Url"]').val(Image);
+                                    TargetDialogItem = { Type: 'dialog.content.image', Index: this.Index };
+                                }.bind({ Index: 0 }));
+                            }
+                    } else {
+                        var $Image = $('<div name="Image1"><img src="../../images/no-image.png"></image></div>');
+                        $Element
+                            .find('div[class="wc-card hero"]')
+                            .prepend($Image);
+                        if (Mode == 'Edit') {
+                            $Image.click(function () {
+                                $('[id^="Template"').addClass('hidden');
+                                $('#TxtDialog').find('.border-highlight').removeClass('border-highlight');
+                                var $Image = $('#TxtDialog').find('div[name="Image1"]');
+                                $Image.addClass('border-highlight');
+                                $('#TemplateImage').removeClass('hidden');
+                                TargetDialogItem = { Type: 'dialog.content.image', Index: 1 };
+                            });
+                        }
+                    }
+                    if (Dialog.content.buttons) {
+                        for (var Idx = 0; Idx < Dialog.content.buttons.length; Idx++) {
+                            var $Li = $('<li></li>');
+                            var $Button = $('<button name="Button' + Idx + '"></button>');
+                            $Button.text(Dialog.content.buttons[Idx].button_text);
+                            if (!Mode) {
+                                $Button.text();
+                            }
+                            $Button = $('<div name="Button' + Idx + '"></div>').append($Button);
+                            $Button.click(function () {
+                                if (Mode == 'Edit') {
+                                    $('#BtnRemoveButton').show();
+                                    var $Button = $('#TxtDialog').find('div[name="Button' + this.Index + '"]');
+                                    $('[id^="Template"').addClass('hidden');
+                                    $('#TxtDialog').find('.border-highlight').removeClass('border-highlight');
+                                    $Button.addClass('border-highlight');
+                                    $('#TemplateButton').removeClass('hidden');
+                                    $('#TemplateButton').attr('mode', 'edit');
+                                    var Button = TargetDialog.content.buttons[this.Index];
+                                    $('#TemplateButton').find('[name="Title"]').val(Button.button_text);
+                                    $('#TemplateButton').find('[name="Value"]').val(Button.url);
+                                    TargetDialogItem = { Type: 'dialog.content.button', Index: this.Index };
+                                } else {
+                                    // 雖然是在 DIV 定義 Click 事件，但從 event 抓到的物件卻是 Button].
+                                    $('#TableDialogs tr')
+                                        .eq(parseInt($(event.srcElement).parent().attr('dialog_id')) + 1)
+                                        .animate({
+                                            opacity: 0.5
+                                        }, 200, function () {
+                                            $('#TableDialogs tr').animate({
+                                                opacity: 1
+                                            }, 200);
+                                        });
+                                }
+                                return false;
+                            }.bind({ Index: Idx }));
+                            $Li.append($Button);
+                            $Element
+                                .find('ul[class="wc-card-buttons"]')
+                                .append($Li);
+                        }
+                    }
+                    if (Mode == 'Edit') {
+                        var $Li = $('<li></li>');
+                        var $Button = $('<button name="Button' + Idx + '"></button>');
+                        $Button.text('新增按鈕');
+                        $Button = $('<div name="Button' + Idx + '"></div>').append($Button);
+                        $Button.click(function () {
+                            $('#BtnRemoveButton').hide();
+                            var $Button = $('#TxtDialog').find('div[name="Button' + this.Index + '"]');
+                            $('[id^="Template"').addClass('hidden');
+                            $('#TxtDialog').find('.border-highlight').removeClass('border-highlight');
+                            $Button.addClass('border-highlight');
+                            $('#TemplateButton').removeClass('hidden');
+                            $('#TemplateButton').attr('mode', 'add');
+                            var Button = { button_text: '按鈕文字', url: '前往的網址' };
+                            $('#TemplateButton').find('[name="Title"]').val(Button.button_text);
+                            $('#TemplateButton').find('[name="Value"]').val(Button.url);
+                            TargetDialogItem = { Type: 'dialog.content.button', Index: this.Index };
+                            return false;
+                        }.bind({ Index: Idx }));
+                        $Li.append($Button);
+                        $Element
+                            .find('ul[class="wc-card-buttons"]')
+                            .append($Li);
+                    }
+                    return $Element;
+                } else if (Dialog.type == 'webapi') {
+                    if (Mode != 'Edit') {
+                        var Html ="呼叫的webapi位置: " + Dialog.content.protocol + '://' + Dialog.content.host + ':' + Dialog.content.port + '/' + Dialog.content.path;
+                        return Html;
+                    }
+                } else if (Dialog.type == 'flow') {
+                    if (Mode != 'Edit') {
+                        var Flow = "跳轉的流程: " + Dialog.content.flowID;
+                        return Flow;
+                    }
+                } else if (Dialog.type == 'image') {
+                    var Title, Subtitle;
+                        Title = '';
+                        Subtitle = Dialog.content.description;
+                    var $Element = $('' +
+                        '<div class="wc-message wc-message-from-bot">' +
+                        '    <div class="wc-message-content">' +
+                        '        <svg class="wc-message-callout">' +
+                        '            <path class="point-left" d="m0,6 l6 6 v-12 z"></path>' +
+                        '            <path class="point-right" d="m6,6 l-6 6 v-12 z"></path>' +
+                        '        </svg>' +
+                        '        <div>' +
+                        '            <div class="wc-list">' +
+                        '                <div class="wc-card hero">' +
+                        '                    <h1><div name="Title">' + Title + '</div></h1>' +
+                        '                    <h2><div name="Subtitle">' + Subtitle + '</div></h2>' +
+                        '                    <ul class="wc-card-buttons">' +
+                        '                    </ul>' +
+                        '                </div>' +
+                        '            </div>' +
+                        '        </div>' +
+                        '    </div>' +
+                        '</div>');
+                    if (Mode == 'Edit') {
+                        $Element
+                            .find('div[name="Title"]')
+                            .attr('Original', Title)
+                            .click(function () {
+                                $('[id^="Template"').addClass('hidden');
+                                $('#TxtDialog').find('.border-highlight').removeClass('border-highlight');
+                                $(this).addClass('border-highlight');
+                                $('#TemplateText').removeClass('hidden');
+                                $('#TemplateText').find('[name="Prompt"]').val($(this).attr('Original'));
+                                TargetDialogItem = { Type: 'dialog.content.title' };
+                            });
+                        $Element
+                            .find('div[name="Subtitle"]')
+                            .attr('Original', Subtitle)
+                            .click(function () {
+                                $('[id^="Template"').addClass('hidden');
+                                $('#TxtDialog').find('.border-highlight').removeClass('border-highlight');
+                                $(this).addClass('border-highlight');
+                                $('#TemplateText').removeClass('hidden');
+                                $('#TemplateText').find('[name="Prompt"]').val($(this).attr('Original'));
+                                TargetDialogItem = { Type: 'dialog.content.subtitle' };
+                            });
+                    }
+                    if (Dialog.content.previewImageUrl) {
+                            var $Image;
+                                $Image = $('<div name="Image' + Idx + '"><img src="' + Dialog.content.previewImageUrl + '"></image></div>');
+                            $Element
+                                .find('div[class="wc-card hero"]')
+                                .prepend($Image);
+                            if (Mode == 'Edit') {
+                                $Image.click(function () {
+                                    $('[id^="Template"').addClass('hidden');
+                                    $('#TxtDialog').find('.border-highlight').removeClass('border-highlight');
+                                    var $Image = $('#TxtDialog').find('div[name="Image' + this.Index + '"]');
+                                    $Image.addClass('border-highlight');
+                                    $('#TemplateImage').removeClass('hidden');
+                                    var Image = TargetDialog.content.previewImageUrl;
+                                    $('#TemplateImage').find('[name="Url"]').val(Image);
+                                    TargetDialogItem = { Type: 'dialog.content.image', Index: this.Index };
+                                }.bind({ Index: Idx }));
+                            }
+                    } else {
+                        var $Image = $('<div name="Image1"><img src="../../images/no-image.png"></image></div>');
+                        $Element
+                            .find('div[class="wc-card hero"]')
+                            .prepend($Image);
+                        if (Mode == 'Edit') {
+                            $Image.click(function () {
+                                $('[id^="Template"').addClass('hidden');
+                                $('#TxtDialog').find('.border-highlight').removeClass('border-highlight');
+                                var $Image = $('#TxtDialog').find('div[name="Image1"]');
+                                $Image.addClass('border-highlight');
+                                $('#TemplateImage').removeClass('hidden');
+                                TargetDialogItem = { Type: 'dialog.content.image', Index: 1 };
+                            });
+                        }
+                    }
+                    return $Element;
+                } else if (Dialog.type == 'page') {
+                    var Title, Subtitle;
+                        Title = Dialog.content.title;
+                        Subtitle = '';
+                    var $Element = $('' +
+                        '<div class="wc-message wc-message-from-bot">' +
+                        '    <div class="wc-message-content">' +
+                        '        <svg class="wc-message-callout">' +
+                        '            <path class="point-left" d="m0,6 l6 6 v-12 z"></path>' +
+                        '            <path class="point-right" d="m6,6 l-6 6 v-12 z"></path>' +
+                        '        </svg>' +
+                        '        <div>' +
+                        '            <div class="wc-list">' +
+                        '                <div class="wc-card hero">' +
+                        '                    <h1><div name="Title">' + Title + '</div></h1>' +
+                        '                    <h2><div name="Subtitle">' + Subtitle + '</div></h2>' +
+                        '                    <ul class="wc-card-buttons">' +
+                        '                    </ul>' +
+                        '                </div>' +
+                        '            </div>' +
+                        '        </div>' +
+                        '    </div>' +
+                        '</div>');
+                        if (Dialog.content.url) {
+                            var $Li = $('<li></li>');
+                            var $Button = $('<button name="Button' + Idx + '"></button>');
+                            $Button.text(Dialog.content.button_text);
+                            if (!Mode) {
+                                $Button.text();
+                            }
+                            $Button = $('<div name="Button' + Idx + '"></div>').append($Button);
+                            $Button.click(function () {
+                                if (Mode == 'Edit') {
+                                    $('#BtnRemoveButton').show();
+                                    var $Button = $('#TxtDialog').find('div[name="Button' + this.Index + '"]');
+                                    $('[id^="Template"').addClass('hidden');
+                                    $('#TxtDialog').find('.border-highlight').removeClass('border-highlight');
+                                    $Button.addClass('border-highlight');
+                                    $('#TemplateButton').removeClass('hidden');
+                                    $('#TemplateButton').attr('mode', 'edit');
+                                    var Button = TargetDialog.content;
+                                    $('#TemplateButton').find('[name="Title"]').val(Button.button_text);
+                                    $('#TemplateButton').find('[name="Value"]').val(Button.url);
+                                    TargetDialogItem = { Type: 'dialog.content.page', Index: this.Index };
+                                } else {
+                                    // 雖然是在 DIV 定義 Click 事件，但從 event 抓到的物件卻是 Button].
+                                    $('#TableDialogs tr')
+                                        .eq(parseInt($(event.srcElement).parent().attr('dialog_id')) + 1)
+                                        .animate({
+                                            opacity: 0.5
+                                        }, 200, function () {
+                                            $('#TableDialogs tr').animate({
+                                                opacity: 1
+                                            }, 200);
+                                        });
+                                }
+                                return false;
+                            }.bind({ Index: Idx }));
+                            $Li.append($Button);
+                            $Element
+                                .find('ul[class="wc-card-buttons"]')
+                                .append($Li);
+                        }
+                    
+                    if (Mode == 'Edit') {
+                        $Element
+                            .find('div[name="Title"]')
+                            .attr('Original', Dialog.content.title)
+                            .click(function () {
+                                $('[id^="Template"').addClass('hidden');
+                                $('#TxtDialog').find('.border-highlight').removeClass('border-highlight');
+                                $(this).addClass('border-highlight');
+                                $('#TemplateText').removeClass('hidden');
+                                $('#TemplateText').find('[name="Prompt"]').val($(this).attr('Original'));
+                                TargetDialogItem = { Type: 'dialog.content.title' };
+                            });
+                        $Element
+                            .find('div[name="Subtitle"]')
+                            .attr('Original', Subtitle)
+                            .click(function () {
+                                $('[id^="Template"').addClass('hidden');
+                                $('#TxtDialog').find('.border-highlight').removeClass('border-highlight');
+                                $(this).addClass('border-highlight');
+                                $('#TemplateText').removeClass('hidden');
+                                $('#TemplateText').find('[name="Prompt"]').val($(this).attr('Original'));
+                                TargetDialogItem = { Type: 'dialog.content.subtitle' };
+                            });
+                        var $Li = $('<li></li>');
+                        var $Button = $('<button name="Button' + Idx + '"></button>');
+                        $Button.text('新增按鈕');
+                        $Button = $('<div name="Button' + Idx + '"></div>').append($Button);
+                        $Button.click(function () {
+                            $('#BtnRemoveButton').hide();
+                            var $Button = $('#TxtDialog').find('div[name="Button' + this.Index + '"]');
+                            $('[id^="Template"').addClass('hidden');
+                            $('#TxtDialog').find('.border-highlight').removeClass('border-highlight');
+                            $Button.addClass('border-highlight');
+                            $('#TemplateButton').removeClass('hidden');
+                            $('#TemplateButton').attr('mode', 'add');
+                            var Button = { button_text: '按鈕文字', url: '前往的網站' };
+                            $('#TemplateButton').find('[name="Title"]').val(Button.button_text);
+                            $('#TemplateButton').find('[name="Value"]').val(Button.url);
+                            TargetDialogItem = { Type: 'dialog.content.page', Index: this.Index };
+                            return false;
+                        }.bind({ Index: Idx }));
+                        $Li.append($Button);
+                        $Element
+                            .find('ul[class="wc-card-buttons"]')
+                            .append($Li);
+                    }
+                    
+                    return $Element;
+                }
+            }
+    
+            function ApplyText() {
+                var Prompt = $('#TemplateText').find('[name="Prompt"]').val();
+                if (TargetDialogItem.Type == 'dialog.prompt') {
+                    TempDialog.content.text = Prompt;
+                } else if (TargetDialogItem.Type == 'dialog.content.title') {
+                    TempDialog.content.title = Prompt;
+                } else if (TargetDialogItem.Type == 'dialog.content.subtitle') {
+                    TempDialog.content.description = Prompt;
+                }
+                $('#TxtDialog').html(CreateContent(TempDialog, 'Edit'));
+                $('#TemplateText').addClass('hidden');
+            }
+    
+            function ApplyButton() {
+                if(TargetDialogItem.Type == 'dialog.content.page') {
+                    if ($('#TemplateButton').attr('mode') == 'edit') {
+                        TempDialog.content.button_text = $('#TemplateButton').find('[name="Title"]').val();
+                        TempDialog.content.url = $('#TemplateButton').find('[name="Value"]').val();
+                    } else {
+                        if (TempDialog.content.button_text == undefined) {
+                            TempDialog.content.button_text = $('#TemplateButton').find('[name="Title"]').val();
+                            TempDialog.content.url = $('#TemplateButton').find('[name="Value"]').val();
+                        }
+                    }
+                }
+                if (TargetDialogItem.Type == 'dialog.content.button') {
+                    if ($('#TemplateButton').attr('mode') == 'edit') {
+                        TempDialog.content.buttons[TargetDialogItem.Index].button_text = $('#TemplateButton').find('[name="Title"]').val();
+                        TempDialog.content.buttons[TargetDialogItem.Index].url = $('#TemplateButton').find('[name="Value"]').val();
+                    } else {
+                        if (TempDialog.content.buttons == undefined) {
+                            TempDialog.content.buttons = [];
+                        }
+                        TempDialog.content.buttons.push({
+                            button_text: $('#TemplateButton').find('[name="Title"]').val(),
+                            url: $('#TemplateButton').find('[name="Value"]').val()
+                        });
+                    }
+                }
+                $('#TxtDialog').html(CreateContent(TempDialog, 'Edit'));
+                $('#TemplateButton').addClass('hidden');
+            }
+    
+            function RemoveButton() {
+                if (TargetDialogItem.Type == 'dialog.content.button') {
+                    if (TempDialog.content.buttons.length == 1) {
+                        ShowMessage('只剩下一個按鈕時無法刪除');
+                        return;
+                    }
+                    TempDialog.content.buttons.splice(TargetDialogItem.Index, 1);
+                }
+                $('#TxtDialog').html(CreateContent(TempDialog, 'Edit'));
+                $('#TemplateImage').addClass('hidden');
+            }
+    
+            function ApplyImage() {
+                if (TargetDialogItem.Type == 'dialog.content.image') {
+                    if (TempDialog.content.previewImageUrl) {
+                        if ($('#TemplateImage').find('[name="Url"]').val() == '') {
+                            ShowMessage('圖片網址無效');
+                            return;
+                        } else {
+                            TempDialog.content.previewImageUrl = $('#TemplateImage').find('[name="Url"]').val();
+                        }
+                    } else {
+                        if ($('#TemplateImage').find('[name="Url"]').val() == '') {
+                            ShowMessage('圖片網址無效');
+                            return;
+                        } else {
+                            TempDialog.content.previewImageUrl = "";
+                            TempDialog.content.previewImageUrl = $('#TemplateImage').find('[name="Url"]').val() ;
+                        }
+                    }
+                }
+                $('#TxtDialog').html(CreateContent(TempDialog, 'Edit'));
+                $('#TemplateImage').addClass('hidden');
+            }
+    
+            function RemoveImage() {
+                if (TargetDialogItem.Type == 'dialog.content.image') {
+                    TempDialog.content.previewImageUrl = undefined;
+                }
+                $('#TxtDialog').html(CreateContent(TempDialog, 'Edit'));
+                $('#TemplateImage').addClass('hidden');
+            }
+    
+            function Loading() {
+                bootbox.dialog({
+                    message: '請稍後',
+                    title: '',
+                    closeButton: false
+                });
+            }
+    
+            function Loaded() {
+                bootbox.hideAll();
+            }
+    
+            function ShowMessage(Message, Callback) {
+                bootbox.alert({
+                    message: Message,
+                    title: ''
+                });
+                if (typeof (Callback) == 'function') {
+                    Callback();
+                }
+            }
+    
+            function guid() {
+                function S4() {
+                    return (((1 + Math.random()) * 0x10000) | 0).toString(16).substring(1);
+                }
+                return (S4() + S4() + "-" + S4() + "-" + S4() + "-" + S4() + "-" + S4() + S4() + S4());
+            }
+    
+            function split(val, string) {
+                return val.split(string);
+            }
+    
+            function extractLast(term, string) {
+                return split(term, string).pop();
+            }
+        </script>
+    </head>
+    
+    <body>
+        <div id="wrapper">
+            <div id="page-wrapper">
+                <div class="row" style="position: relative">
+                    <div class="col-lg-12">
+                        <h1 name="title" class="page-header">QA編輯器</h1>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-lg-12">
+                    <div class="panel panel-default">
+                        <div class="panel-heading" style="height: 60px">
+                            <div class="pull-left">
+                                <div class="btn-group">
+                                    <select id="SelLocale" class="form-control">
+                                        <option value='tw'>中文</option>
+                                        <option value='cn'>簡中</option>
+                                        <option value='en'>英文</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="pull-right">
+                                <button type="button" id="BtnPublish" title="發布" class="btn btn-primary btn-sm">
+                                    <i class="glyphicon glyphicon-upload"></i>
+                                </button>
+                                <button type="button" id="BtnAdd" title="新增" class="btn btn-success btn-sm">
+                                    <i class="fa fa-plus"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="panel-body">
+                            <div class="table-responsive">
+                                <table class="table table-striped table-bordered table-hover" id="TableDialogs">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 20px"></th>
+                                            <th style="width: 20px"></th>
+                                            <th style="width: 150px">關鍵字</th>
+                                            <th>答案</th>
+                                            <th style="width: 80px">類型</th>
+                                            <th style="width: 80px">QA編碼</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Dialog Modal -->
+        <div class="modal modal-wide fade" id="DialogModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <form id="DialogForm" role="form">
+                        <div class="modal-header">
+                            <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+                            <h4 id="ModalTitle" class="modal-title"></h4>
+                        </div>
+                        <div class="modal-body">
+                            <div class="row">
+                                <div class="col-lg-6">
+                                    <div class="form-group">
+                                        <span class="fa fa-asterisk"></span>
+                                        <label>關鍵字：</label>
+                                        <input class="form-control" id="TxtQuestion" name="Question">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>QA編碼：</label>
+                                        <input class="form-control" id="TxtPas" name="Pas">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>答案類型：</label>
+                                        <select class="form-control" id="TxtType" name="Type">
+                                            <option value="text">文字</option>
+                                            <option value="image">圖片</option>
+                                            <option value="page">網頁</option>
+                                            <option value="webapi">WEB API</option>
+                                            <option value="flow">流程</option>
+                                            <option value="choice">選單</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-lg-12 hidden" id="DivDialog">
+                                    <div class="form-group">
+                                        <label>預覽：</label>
+                                        <div class="panel panel-default">
+                                            <div class="panel-body">
+                                                <div class="col-lg-6">
+                                                    <div id="TxtDialog" name="Dialog"></div>
+                                                </div>
+                                                <div class="col-lg-6">
+                                                    <div id="TemplateText" class="hidden">
+                                                        <label>文字：</label>
+                                                        <div class="ui-widget">
+                                                            <input type="text" name="Prompt" class="form-control auto_complete"></input>
+                                                        </div>
+                                                        <div class="pull-right">
+                                                            <button type="button" class="btn btn-success" onclick="ApplyText();">套用</button>
+                                                        </div>
+                                                    </div>
+                                                    <div id="TemplateButton" class="hidden">
+                                                        <label>按鈕文字：</label>
+                                                        <div class="ui-widget">
+                                                            <input type="text" name="Title" class="form-control auto_complete"></input>
+                                                        </div>
+                                                        <div id="ButtonTypeText">
+                                                            <label>URL：</label>
+                                                            <div class="ui-widget">
+                                                                <input type="text" name="Value" class="form-control auto_complete"></input>
+                                                            </div>
+                                                        </div>
+                                                        <input id="file" type="file" name="file" />
+                                                        <button type="button" id="QA" class="fa fa-cloud-upload">上傳檔案</button>
+                                                        <!-- 按鈕的 id 是動態的，如 QA01、QA02 -->
+                                                        <div class="pull-right">
+                                                            <button type="button" class="btn btn-danger" id="BtnRemoveButton" onclick="RemoveButton();">移除按鈕</button>
+                                                            <button type="button" class="btn btn-success" onclick="ApplyButton();">套用</button>
+                                                        </div>
+                                                    </div>
+                                                    <div id="TemplateImage" class="hidden">
+                                                        <label>圖片網址：</label>
+                                                        <input type="text" name="Url" class="form-control"></input>
+                                                        <input id="image_file" type="file" name="file" />
+                                                        <button type="button" id="QA_image" class="fa fa-cloud-upload">上傳檔案</button>
+                                                        <br>
+                                                        <div class="pull-right">
+                                                            <button type="button" class="btn btn-danger" onclick="RemoveImage();">移除圖片</button>
+                                                            <button type="button" class="btn btn-success" onclick="ApplyImage();">套用</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-lg-12 hidden" id="DivWebAPI">
+                                    <div class="form-group">
+                                        <label>Web API：</label>
+                                        <div class="panel panel-default">
+                                            <div class="panel-body">
+                                                <div class="row">
+                                                    <div class="form-group col-lg-12">
+                                                        <table class="row">
+                                                            <tr>
+                                                                <td>
+                                                                    <select name="Method" class="form-control">
+                                                                        <option value="get">GET</option>
+                                                                    </select>
+                                                                </td>
+                                                                <td>
+                                                                    <select name="Protocol" class="form-control">
+                                                                        <option value="http">HTTP</option>
+                                                                        <option value="https">HTTPS</option>
+                                                                    </select>
+                                                                </td>
+                                                                <td>
+                                                                    <label>&nbsp;://&nbsp;</label>
+                                                                    </dtdiv>
+                                                                    <td>
+                                                                        <input name="Host" class="form-control"></input>
+                                                                    </td>
+                                                                    <td>
+                                                                        <label>&nbsp;:&nbsp;</label>
+                                                                    </td>
+                                                                    <td>
+                                                                        <input name="Port" class="form-control"></input>
+                                                                    </td>
+                                                                    <td>
+                                                                        <label>&nbsp;/&nbsp;</label>
+                                                                    </td>
+                                                                    <td>
+                                                                        <input name="Path" class="form-control"></input>
+                                                                    </td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td>
+                                                                    <br />
+                                                                    <button type="button" class="btn btn-success hidden" id="BtnParams">參數設定</button>
+                                                                </td>
+                                                            </tr>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-lg-12 hidden" id="DivFlow">
+                                    <div class="form-group">
+                                        <label>Flow：</label>
+                                        <div class="panel panel-default">
+                                            <div class="panel-body">
+                                                <div class="row">
+                                                    <div class="form-group col-lg-12">
+                                                        <table class="row">
+                                                            <tr>
+                                                                <td>
+                                                                    <label>Flow:</label>
+                                                                </td>
+                                                                <td>
+                                                                    <select name="Flow" class="form-control"></select>
+                                                                </td>
+                                                            </tr>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-default" data-dismiss="modal">取消</button>
+                            <button type="submit" id="BtnSave" class="btn btn-primary">儲存</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <!-- POST Modal -->
+        <div class="modal modal-middle fade" id="PostModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+                        <h4 class="modal-title">POST 參數設定</h4>
+                    </div>
+                    <div class="modal-body">
+                        <span>HEADER</span>
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="TableHeaders">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 20px"></th>
+                                        <th style="width: 100px">名稱</th>
+                                        <th style="width: 100px">內容</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                        <div class="pull-right">
+                            <button type="button" id="BtnAddHeader" title="新增" class="btn btn-success btn-xs">
+                                <i class="fa fa-plus"></i>
+                            </button>
+                        </div>
+                        <br />
+                        <span>BODY</span>
+                        <div>
+                            <textarea rows="5" name="Body" class="form-control" style="resize: none"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-default" data-dismiss="modal">取消</button>
+                        <button type="submit" id="BtnSavePost" class="btn btn-primary">儲存</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </body>
+
+</html>
